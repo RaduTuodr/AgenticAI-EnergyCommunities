@@ -1,6 +1,6 @@
 from CommunityData import *
 
-excel_path = '../data/EC_EV_dataset (fixed error).xlsx'
+excel_path = '../../data/EC_EV_dataset (fixed error).xlsx'
 community = CommunityData(excel_path)
 
 print(community.get_data(1))
