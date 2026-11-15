@@ -30,6 +30,9 @@ class Battery:
     initial_charge: float = 0.0
     final_charge: float = 0.0
 
+    last_energy_absorbed: float = 0.0
+    last_energy_delivered: float = 0.0
+
     def __post_init__(self) -> None:
         if self.current_charge == 0.0 and self.initial_charge > 0.0:
             self.current_charge = self.initial_charge
@@ -52,41 +55,39 @@ class Battery:
 
     def charge(self, power_kw: float, duration_hours: float = 0.25) -> float:
         """Charge the battery with the given power for a time interval."""
-        if power_kw <= 0 or self.available_capacity <= 0:
-            return 0.0
 
-        # Cap the charging power to its maximum
         actual_power = min(power_kw, self.max_charge)
+        offered_energy = actual_power * duration_hours
+        potential_stored = offered_energy * self.efficiency
 
-        added_energy = actual_power * duration_hours * self.efficiency
+        if potential_stored > self.available_capacity:
+            stored_energy = self.available_capacity
+            absorbed_energy = stored_energy / self.efficiency
+        else:
+            stored_energy = potential_stored
+            absorbed_energy = offered_energy
 
-        # Cap by available capacity
-        if added_energy > self.available_capacity:
-            added_energy = self.available_capacity
-            actual_power = added_energy / (duration_hours * self.efficiency)
-
-        self.current_charge += added_energy
-        return actual_power
+        self.current_charge += stored_energy
+        self.last_energy_absorbed += absorbed_energy
+        return stored_energy
 
     def discharge(self, power_kw: float, duration_hours: float = 0.25) -> float:
         """Discharge the battery with the given power for a time interval."""
-        if power_kw <= 0 or self.available_energy <= 0:
-            return 0.0
 
-        # Cap the discharging power to the battery specific minimum
         requested_power = min(power_kw, self.max_discharge)
+        requested_delivered_energy = requested_power * duration_hours
+        needed_drawn_energy = requested_delivered_energy / self.efficiency
 
-        energy_drawn = (requested_power * duration_hours) / self.efficiency
-
-        # Cap by available energy
-        if energy_drawn > self.available_energy:
-            energy_drawn = self.available_energy
-            actual_power = (energy_drawn * self.efficiency) / duration_hours
+        if needed_drawn_energy > self.available_energy:
+            drawn_energy = self.available_energy
+            delivered_energy = drawn_energy * self.efficiency
         else:
-            actual_power = requested_power
+            drawn_energy = needed_drawn_energy
+            delivered_energy = requested_delivered_energy
 
-        self.current_charge -= energy_drawn
-        return actual_power
+        self.current_charge -= drawn_energy
+        self.last_energy_delivered = delivered_energy
+        return delivered_energy
 
     def reset(self) -> None:
         """Reset the battery charge back to its initial charge state."""

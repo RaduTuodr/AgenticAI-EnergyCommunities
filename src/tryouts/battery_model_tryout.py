@@ -86,3 +86,37 @@ print(battery.current_charge)
 discharged_kw = battery.discharge(power_kw=1.5, duration_hours=0.25)
 
 print(battery.current_charge)
+
+print('='*30)
+
+full_bat = Battery(
+    model_id=1, name="Test", capacity=10.0, max_charge=5.0,
+    max_discharge=5.0, efficiency=0.9, current_charge=10.0
+)
+stored = full_bat.charge(power_kw=4.0, duration_hours=0.25)
+print(f"Case 1 (Full Battery Charge): stored = {stored} kWh (expected 0.0)")
+
+# 2. Discharging an empty battery should deliver NOTHING (0.0 kWh)
+empty_bat = Battery(
+    model_id=1, name="Test", capacity=10.0, max_charge=5.0,
+    max_discharge=5.0, efficiency=0.9, current_charge=0.0
+)
+delivered = empty_bat.discharge(power_kw=4.0, duration_hours=0.25)
+print(f"Case 2 (Empty Battery Discharge): delivered = {delivered} kWh (expected 0.0)")
+
+# 3. Power exceeding max_charge should be capped
+bat3 = Battery(
+    model_id=1, name="Test", capacity=20.0, max_charge=4.0,
+    max_discharge=4.0, efficiency=1.0, current_charge=0.0
+)
+# Request 10 kW for 1 hour -> capped at 4 kW * 1h = 4.0 kWh
+stored = bat3.charge(power_kw=10.0, duration_hours=1.0)
+print(f"Case 3 (Max Charge Power Limit): stored = {stored} kWh (expected 4.0)")
+
+# 4. Check efficiency: 4 kWh absorbed at 90% efficiency -> 3.6 kWh stored
+bat4 = Battery(
+    model_id=1, name="Test", capacity=10.0, max_charge=10.0,
+    max_discharge=10.0, efficiency=0.90, current_charge=0.0
+)
+stored = bat4.charge(power_kw=4.0, duration_hours=1.0)
+print(f"Case 4 (Efficiency 90%): stored = {stored} kWh (expected 3.6)")
