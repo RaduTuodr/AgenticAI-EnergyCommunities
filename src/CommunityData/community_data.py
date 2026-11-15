@@ -60,6 +60,31 @@ class CommunityData:
             for name, frame in sheets.items()
         }
 
+    def get_battery_specs(self) -> dict[str, dict]:
+        """
+        Extracts battery specs from the 'BESS' sheet.
+        Returns a dictionary keyed by household_id for all households with a battery.
+        """
+        bess_df = pd.read_excel(self.__workbook_path, sheet_name="BESS").set_index("ID")
+
+        battery_specs = {}
+        for col in bess_df.columns:
+            hid = str(col)
+            model_id = int(bess_df.loc["Model", col])
+            capacity = float(bess_df.loc["Capacity (kW)", col])
+
+            if model_id > 0 and capacity > 0:
+                battery_specs[hid] = {
+                    "model_id": model_id,
+                    "capacity": capacity,
+                    "max_charge": float(bess_df.loc["Charge (kW)", col]),
+                    "max_discharge": float(bess_df.loc["Discharge (kW)", col]),
+                    "efficiency": float(bess_df.loc["Eficiency", col]),
+                    "initial_charge": float(bess_df.loc["Initial (kW)", col]),
+                    "final_charge": float(bess_df.loc["Final (kW)", col]),
+                }
+        return battery_specs
+
     def _timestamp_to_index(self, timestamp: Timestamp) -> int:
         if isinstance(timestamp, int):
             if 1 <= timestamp <= len(next(iter(self._data.values()))):
