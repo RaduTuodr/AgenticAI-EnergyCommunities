@@ -15,6 +15,8 @@ class CommunityData:
         "solar_production": "PV",
         "ev1_consumption": "EV1 Load",
         "ev2_consumption": "EV2 Load",
+        "buy_price": "Buy Price",
+        "sell_price": "Sell Price",
     }
 
     def __init__(self, workbook_path: str | Path):
@@ -36,7 +38,7 @@ class CommunityData:
         )
         result["ev_consumption"] = (result["ev1_consumption"] + result["ev2_consumption"])
         return result[
-            ["consumption", "solar_production", "ev_consumption"]
+            ["consumption", "solar_production", "ev_consumption", "buy_price", "sell_price"]
         ].rename_axis("household_id")
 
     def _load_data(self) -> dict[str, pd.DataFrame]:

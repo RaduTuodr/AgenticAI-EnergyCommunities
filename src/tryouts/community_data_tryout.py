@@ -1,7 +1,7 @@
-from CommunityData import *
+from src.CommunityData import *
+from src.config import EXCEL_DATASET_PATH
 
-excel_path = '../../data/EC_EV_dataset (fixed error).xlsx'
-community = CommunityData(excel_path)
+community = CommunityData(EXCEL_DATASET_PATH)
 
 print(community.get_data(1))
 
@@ -28,3 +28,10 @@ print(community.get_data("00:00 - 00:15"))
 print(community.get_data("00:00 - 00:15").loc["1", "consumption"])
 
 # 1.556922571
+
+battery_specs = community.get_battery_specs()
+print(f"Total households with batteries: {len(battery_specs)} / 250")
+print("Household 1 Battery Spec:", battery_specs.get("1"))
+
+# Total households with batteries: 150 / 250
+# Household 1 Battery Spec: {'model_id': 8, 'capacity': 6.4, 'max_charge': 2.0, 'max_discharge': 2.0, 'efficiency': 0.95, 'initial_charge': 3.2, 'final_charge': 3.2}
