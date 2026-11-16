@@ -9,6 +9,8 @@ def run_simulation(
         community_data: CommunityData,
         controller: RuleBasedController,
         time_step_hours: float = 0.25,
+        use_batteries: bool = True,
+        allow_sharing: bool = False
 ) -> pd.DataFrame:
 
     battery_specs = community_data.get_battery_specs()
@@ -32,6 +34,8 @@ def run_simulation(
         step_revenue = 0.0
         step_charged = 0.0
         step_discharged = 0.0
+        final_bought = 0.0
+        final_sold = 0.0
 
         for hid, row in df.iterrows():
             solar_kw = float(row["solar_production"])
@@ -49,7 +53,7 @@ def run_simulation(
             energy_charged = 0.0
             energy_discharged = 0.0
 
-            if hid in batteries:
+            if use_batteries and hid in batteries:
                 battery = batteries[hid]
                 if charge_kw > 0.0:
                     battery.charge(charge_kw, duration_hours=time_step_hours)
@@ -82,6 +86,16 @@ def run_simulation(
             step_bought += bought_kwh
             step_sold += sold_kwh
 
+            # if sharing between neighbors enabled:
+            shared_kwh = 0.0
+            final_bought = step_bought
+            final_sold = step_sold
+
+            if allow_sharing:
+                shared_kwh = min(step_sold, step_bought)
+                final_bought = max(0.0, step_bought - step_sold)
+                final_sold = max(0.0, step_sold - step_bought)
+
         records.append({
             "time_step": t,
             "solar_kwh": step_solar,
@@ -90,8 +104,8 @@ def run_simulation(
             "total_demand_kwh": step_consumption + step_ev,
             "battery_charged_kwh": step_charged,
             "battery_discharged_kwh": step_discharged,
-            "grid_bought_kwh": step_bought,
-            "grid_sold_kwh": step_sold,
+            "grid_bought_kwh": final_bought,
+            "grid_sold_kwh": final_sold,
             "cost_eur": step_cost,
             "revenue_eur": step_revenue,
         })
@@ -134,7 +148,13 @@ if __name__ == "__main__":
     community = CommunityData(EXCEL_DATASET_PATH)
     controller = RuleBasedController()
 
-    table = run_simulation(community, controller)
+    table = run_simulation(
+        community,
+        controller,
+        time_step_hours=0.25,
+        use_batteries = True,
+        allow_sharing = True
+    )
 
     check_energy_balance(table)
 
