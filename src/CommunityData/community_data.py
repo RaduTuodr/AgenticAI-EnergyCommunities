@@ -87,6 +87,23 @@ class CommunityData:
                 }
         return battery_specs
 
+    def resample(self, time_step_hours: float) -> CommunityData:
+        """
+        Returns a new CommunityData instance resampled to time_step_hours (e.g. 0.5 or 1.0).
+        Power (kW) and prices are averaged across intervals.
+        """
+        factor = int(round(time_step_hours / 0.25))
+        if factor <= 1:
+            return self
+
+        import copy
+        new_cd = copy.copy(self)
+        new_cd._data = {
+            name: frame.groupby(frame.index // factor).mean()
+            for name, frame in self._data.items()
+        }
+        return new_cd
+
     def _timestamp_to_index(self, timestamp: Timestamp) -> int:
         if isinstance(timestamp, int):
             if 1 <= timestamp <= len(next(iter(self._data.values()))):
