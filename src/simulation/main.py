@@ -28,6 +28,8 @@ def run_simulation(
         step_ev = 0.0
         step_bought = 0.0
         step_sold = 0.0
+        step_cost = 0.0
+        step_revenue = 0.0
         step_charged = 0.0
         step_discharged = 0.0
 
@@ -68,6 +70,9 @@ def run_simulation(
                 bought_kwh = -net_energy
                 sold_kwh = 0.0
 
+            step_cost += bought_kwh * float(row["buy_price"])
+            step_revenue += sold_kwh * float(row["sell_price"])
+
             # Aggregate community totals
             step_solar += solar_kwh
             step_consumption += base_kw * time_step_hours
@@ -87,6 +92,8 @@ def run_simulation(
             "battery_discharged_kwh": step_discharged,
             "grid_bought_kwh": step_bought,
             "grid_sold_kwh": step_sold,
+            "cost_eur": step_cost,
+            "revenue_eur": step_revenue,
         })
 
     return pd.DataFrame(records)
