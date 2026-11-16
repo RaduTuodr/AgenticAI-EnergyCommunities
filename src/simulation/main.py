@@ -113,7 +113,7 @@ def compute_results(table: pd.DataFrame, time_step_hours: float = 0.25) -> dict:
 
     return {
         "Total Energy Bought": total_bought,
-        "Total Energy Solar": total_sold,
+        "Total Energy Sold": total_sold,
         "Total Cost": total_cost,
         "Self-Consumption": self_consumption_ratio,
         "Peak Grid Power (kW)": peak_grid_power,
@@ -135,5 +135,9 @@ if __name__ == "__main__":
     controller = RuleBasedController()
 
     table = run_simulation(community, controller)
-    print("Simulation finished. RecordedTable.head():")
-    print(table)
+
+    check_energy_balance(table)
+
+    results = compute_results(table)
+    for metric, val in results.items():
+        print(f"{metric}: {val:.2f}")
