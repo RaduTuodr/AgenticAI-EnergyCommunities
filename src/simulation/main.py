@@ -34,8 +34,6 @@ def run_simulation(
         step_revenue = 0.0
         step_charged = 0.0
         step_discharged = 0.0
-        final_bought = 0.0
-        final_sold = 0.0
 
         for hid, row in df.iterrows():
             solar_kw = float(row["solar_production"])
@@ -77,7 +75,7 @@ def run_simulation(
             step_cost += bought_kwh * float(row["buy_price"])
             step_revenue += sold_kwh * float(row["sell_price"])
 
-            # Aggregate community totals
+            # aggregate community totals
             step_solar += solar_kwh
             step_consumption += base_kw * time_step_hours
             step_ev += ev_kw * time_step_hours
@@ -86,15 +84,20 @@ def run_simulation(
             step_bought += bought_kwh
             step_sold += sold_kwh
 
-            # if sharing between neighbors enabled:
-            shared_kwh = 0.0
-            final_bought = step_bought
-            final_sold = step_sold
+        # if sharing between neighbors enabled:
+        shared_kwh = 0.0
+        final_bought = step_bought
+        final_sold = step_sold
 
-            if allow_sharing:
-                shared_kwh = min(step_sold, step_bought)
-                final_bought = max(0.0, step_bought - step_sold)
-                final_sold = max(0.0, step_sold - step_bought)
+        if allow_sharing:
+            shared_kwh = min(step_sold, step_bought)
+            final_bought = max(0.0, step_bought - step_sold)
+            final_sold = max(0.0, step_sold - step_bought)
+
+            if step_bought > 0:
+                step_cost *= (final_bought / step_bought)
+            if step_sold > 0:
+                step_revenue *= (final_sold / step_sold)
 
         records.append({
             "time_step": t,
@@ -106,6 +109,7 @@ def run_simulation(
             "battery_discharged_kwh": step_discharged,
             "grid_bought_kwh": final_bought,
             "grid_sold_kwh": final_sold,
+            "shared_kwh": shared_kwh,
             "cost_eur": step_cost,
             "revenue_eur": step_revenue,
         })
@@ -125,12 +129,15 @@ def compute_results(table: pd.DataFrame, time_step_hours: float = 0.25) -> dict:
 
     peak_grid_power = (table["grid_bought_kwh"] / time_step_hours).max()
 
+    shared_energy = table["shared_kwh"].sum() if "shared_kwh" in table.columns else 0.0
+
     return {
         "Total Energy Bought": total_bought,
         "Total Energy Sold": total_sold,
         "Total Cost": total_cost,
         "Self-Consumption": self_consumption_ratio,
         "Peak Grid Power (kW)": peak_grid_power,
+        "Shared Between Neighbours": shared_energy,
     }
 
 def check_energy_balance(table: pd.DataFrame, tolerance: float = 1e-4) -> bool:
@@ -144,20 +151,27 @@ def check_energy_balance(table: pd.DataFrame, tolerance: float = 1e-4) -> bool:
         raise ValueError(f"Energy Balance failed at step {bad_step}. IN={energy_in:.4f}, OUT={energy_out:.4f}")
     return True
 
+def print_comm_results(results: list[(str, dict)]):
+    print("==== Scenario Comparison ====")
+    header = f"{'Metric':<30} |" + "".join(f" {col_name:<15} |" for col_name, _ in results)
+    print(header)
+    print("-" * len(header))
+
+    for k in results[0][1].keys():
+        print(f"{k:<30} |" + "".join([f" {result[k]:<15.2f} |" for _, result in results]))
+
+
 if __name__ == "__main__":
     community = CommunityData(EXCEL_DATASET_PATH)
     controller = RuleBasedController()
 
-    table = run_simulation(
-        community,
-        controller,
-        time_step_hours=0.25,
-        use_batteries = True,
-        allow_sharing = True
-    )
+    table_nobat = run_simulation(community, controller, use_batteries=False, allow_sharing=False)
+    res_nobat = compute_results(table_nobat)
 
-    check_energy_balance(table)
+    table_ind = run_simulation(community, controller, use_batteries=True, allow_sharing=False)
+    res_ind = compute_results(table_ind)
 
-    results = compute_results(table)
-    for metric, val in results.items():
-        print(f"{metric}: {val:.2f}")
+    table_shared = run_simulation(community, controller, use_batteries=True, allow_sharing=True)
+    res_shared = compute_results(table_shared)
+
+    print_comm_results([("No Batteries", res_nobat), ("Individual BESS", res_ind), ("BESS + Sharing", res_shared)])
