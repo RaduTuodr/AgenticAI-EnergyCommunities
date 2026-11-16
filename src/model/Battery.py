@@ -56,6 +56,10 @@ class Battery:
     def charge(self, power_kw: float, duration_hours: float = 0.25) -> float:
         """Charge the battery with the given power for a time interval."""
 
+        if self.available_capacity <= 0:
+            self.last_energy_absorbed = 0.0
+            return 0.0
+
         actual_power = min(power_kw, self.max_charge)
         offered_energy = actual_power * duration_hours
         potential_stored = offered_energy * self.efficiency
