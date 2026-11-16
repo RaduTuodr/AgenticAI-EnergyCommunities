@@ -68,7 +68,7 @@ class Battery:
             absorbed_energy = offered_energy
 
         self.current_charge += stored_energy
-        self.last_energy_absorbed += absorbed_energy
+        self.last_energy_absorbed = absorbed_energy
         return stored_energy
 
     def discharge(self, power_kw: float, duration_hours: float = 0.25) -> float:
