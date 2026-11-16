@@ -1,5 +1,6 @@
 import pandas as pd
 from src.CommunityData import CommunityData
+from src.PrettyPrint.table_print import table_print
 from src.model.Battery import Battery
 from src.config import EXCEL_DATASET_PATH
 from src.simulation.core.controller import RuleBasedController
@@ -10,8 +11,9 @@ def run_simulation(
         controller: RuleBasedController,
         time_step_hours: float = 0.25,
         use_batteries: bool = True,
-        allow_sharing: bool = False
-) -> pd.DataFrame:
+        allow_sharing: bool = False,
+        track_households: bool = False,
+) -> pd.DataFrame | tuple[pd.DataFrame, pd.DataFrame]:
 
     battery_specs = community_data.get_battery_specs()
     batteries: dict[str, Battery] = {
@@ -20,7 +22,8 @@ def run_simulation(
     }
 
     records = []
-    num_steps = 96
+    hh_records = [] if track_households else None
+    num_steps = int(round(24 / time_step_hours))
 
     for t in range(1, num_steps + 1):
         df = community_data.get_data(t)
@@ -84,7 +87,17 @@ def run_simulation(
             step_bought += bought_kwh
             step_sold += sold_kwh
 
-        # if sharing between neighbors enabled:
+            if hh_records is not None:
+                soc_kwh = batteries[hid].current_charge if hid in batteries else 0.0
+                hh_records.append({
+                    "time_step": t,
+                    "household_id": hid,
+                    "solar_kwh": solar_kwh,
+                    "demand_kwh": demand_kwh,
+                    "battery_soc_kwh": soc_kwh,
+                    "grid_bought_kwh": bought_kwh,
+                    "grid_sold_kwh": sold_kwh,
+                })
         shared_kwh = 0.0
         final_bought = step_bought
         final_sold = step_sold
@@ -114,7 +127,10 @@ def run_simulation(
             "revenue_eur": step_revenue,
         })
 
-    return pd.DataFrame(records)
+    community_df = pd.DataFrame(records)
+    if hh_records is not None:
+        return community_df, pd.DataFrame(hh_records)
+    return community_df
 
 
 def compute_results(table: pd.DataFrame, time_step_hours: float = 0.25) -> dict:
@@ -151,16 +167,6 @@ def check_energy_balance(table: pd.DataFrame, tolerance: float = 1e-4) -> bool:
         raise ValueError(f"Energy Balance failed at step {bad_step}. IN={energy_in:.4f}, OUT={energy_out:.4f}")
     return True
 
-def print_comm_results(results: list[(str, dict)]):
-    print("==== Scenario Comparison ====")
-    header = f"{'Metric':<30} |" + "".join(f" {col_name:<15} |" for col_name, _ in results)
-    print(header)
-    print("-" * len(header))
-
-    for k in results[0][1].keys():
-        print(f"{k:<30} |" + "".join([f" {result[k]:<15.2f} |" for _, result in results]))
-
-
 if __name__ == "__main__":
     community = CommunityData(EXCEL_DATASET_PATH)
     controller = RuleBasedController()
@@ -174,4 +180,4 @@ if __name__ == "__main__":
     table_shared = run_simulation(community, controller, use_batteries=True, allow_sharing=True)
     res_shared = compute_results(table_shared)
 
-    print_comm_results([("No Batteries", res_nobat), ("Individual BESS", res_ind), ("BESS + Sharing", res_shared)])
+    table_print([("No Batteries", res_nobat), ("Individual BESS", res_ind), ("BESS + Sharing", res_shared)])
