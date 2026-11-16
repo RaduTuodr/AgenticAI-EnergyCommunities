@@ -99,6 +99,37 @@ def run_simulation(
     return pd.DataFrame(records)
 
 
+def compute_results(table: pd.DataFrame, time_step_hours: float = 0.25) -> dict:
+    """Compute community cost metrics from record table"""
+    total_bought = table["grid_bought_kwh"].sum()
+    total_sold = table["grid_sold_kwh"].sum()
+    total_cost = table["cost_eur"].sum() - table["revenue_eur"].sum()
+
+    total_solar = table["solar_kwh"].sum()
+    solar_used_inside = total_solar - total_sold
+    self_consumption_ratio = (solar_used_inside / total_solar) * 100 if total_solar > 0 else 0.0
+
+    peak_grid_power = (table["grid_bought_kwh"] / time_step_hours).max()
+
+    return {
+        "Total Energy Bought": total_bought,
+        "Total Energy Solar": total_sold,
+        "Total Cost": total_cost,
+        "Self-Consumption": self_consumption_ratio,
+        "Peak Grid Power (kW)": peak_grid_power,
+    }
+
+def check_energy_balance(table: pd.DataFrame, tolerance: float = 1e-4) -> bool:
+    """Energy In = Energy Out check"""
+    energy_in = (table["solar_kwh"] + table["grid_bought_kwh"] + table["battery_discharged_kwh"])
+    energy_out = (table["total_demand_kwh"] + table["grid_sold_kwh"] + table["battery_charged_kwh"])
+    diff = (energy_in - energy_out).abs()
+    max_error = diff.max()
+    if max_error > tolerance:
+        bad_step = diff.idxmax() + 1
+        raise ValueError(f"Energy Balance failed at step {bad_step}. IN={energy_in:.4f}, OUT={energy_out:.4f}")
+    return True
+
 if __name__ == "__main__":
     community = CommunityData(EXCEL_DATASET_PATH)
     controller = RuleBasedController()
